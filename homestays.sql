@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Máy chủ: 127.0.0.1
--- Thời gian đã tạo: Th10 28, 2025 lúc 02:43 AM
+-- Thời gian đã tạo: Th12 01, 2025 lúc 06:10 AM
 -- Phiên bản máy phục vụ: 10.4.32-MariaDB
 -- Phiên bản PHP: 8.0.30
 
@@ -39,13 +39,6 @@ CREATE TABLE `bookings` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Đang đổ dữ liệu cho bảng `bookings`
---
-
-INSERT INTO `bookings` (`id`, `user_id`, `homestay_id`, `check_in`, `check_out`, `total_price`, `guests_count`, `status`, `created_at`) VALUES
-(1, 3, 34, '2025-10-30', '2025-11-01', 8150000, 1, 'pending', '2025-11-28 01:14:56');
-
 -- --------------------------------------------------------
 
 --
@@ -53,7 +46,7 @@ INSERT INTO `bookings` (`id`, `user_id`, `homestay_id`, `check_in`, `check_out`,
 --
 
 CREATE TABLE `homestays` (
-  `id` int(11) NOT NULL,
+  `homestay_id` int(10) UNSIGNED NOT NULL,
   `name` varchar(255) NOT NULL,
   `district` varchar(100) NOT NULL,
   `address` varchar(500) NOT NULL,
@@ -73,7 +66,7 @@ CREATE TABLE `homestays` (
 -- Đang đổ dữ liệu cho bảng `homestays`
 --
 
-INSERT INTO `homestays` (`id`, `name`, `district`, `address`, `description`, `price_weekday`, `price_weekend`, `price_extra_guest`, `max_guests`, `num_bedrooms`, `num_beds`, `main_image`, `rating`, `num_reviews`) VALUES
+INSERT INTO `homestays` (`homestay_id`, `name`, `district`, `address`, `description`, `price_weekday`, `price_weekend`, `price_extra_guest`, `max_guests`, `num_bedrooms`, `num_beds`, `main_image`, `rating`, `num_reviews`) VALUES
 (1, 'Hanoi Home 2 - View Hồ Tây', 'Tây Hồ', 'Làng Yên Phụ, Tây Hồ', 'Căn hộ dịch vụ view Hồ Tây, miễn phí xe đạp. Đầy đủ tiện nghi máy lạnh, máy sưởi ấm cho mùa đông, đồ nấu ăn, hệ thống bếp, máy giặt sấy...\nPhù hợp cho cặp vợ chồng, người thích ngắm cảnh, không gian yên tĩnh.', 700000, 850000, 0, 2, 1, 1, 'hanoi_home_2.jpg', 4.8, 206),
 (2, 'Dudy\'s House - 1PN', 'Tây Hồ', '20 Mạc Đĩnh Chi, Trúc Bạch', 'Nằm trung tâm Đảo Ngọc Trúc Bạch, cách hồ Tây 5 phút đi bộ.\nDiện tích 60m2, gồm 1 phòng ngủ, 1 phòng khách, bếp nấu ăn.\nTrang bị: Điều hòa, Smart TV, Sofa bed, Thang máy.', 950000, 1100000, 200000, 3, 1, 1, 'dudys_house.jpg', 4.5, 102),
 (3, 'M Library Apartment - Navy Penthouse', 'Tây Hồ', 'Tây Hồ, Hà Nội', 'Căn hộ Penthouse sang trọng, view thành phố.\nVị trí đắc địa giữa trung tâm quận Tây Hồ, không gian yên tĩnh, đẳng cấp 5 sao.\nCách Thung lũng hoa Hồ Tây 1.4km.', 1790000, 1950000, 0, 2, 1, 1, 'mlibrary.jpg', 5, 174),
@@ -112,6 +105,19 @@ INSERT INTO `homestays` (`id`, `name`, `district`, `address`, `description`, `pr
 -- --------------------------------------------------------
 
 --
+-- Cấu trúc bảng cho bảng `images`
+--
+
+CREATE TABLE `images` (
+  `image_id` int(11) NOT NULL,
+  `makhs` int(11) NOT NULL,
+  `image_path` varchar(255) NOT NULL,
+  `is_primary` tinyint(1) DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Cấu trúc bảng cho bảng `posts`
 --
 
@@ -142,23 +148,58 @@ INSERT INTO `posts` (`id`, `title`, `category`, `description`, `content`, `image
 -- --------------------------------------------------------
 
 --
+-- Cấu trúc bảng cho bảng `qtrivien`
+--
+
+CREATE TABLE `qtrivien` (
+  `id` int(11) NOT NULL,
+  `username` varchar(50) NOT NULL,
+  `fullname` varchar(100) NOT NULL,
+  `email` varchar(100) NOT NULL,
+  `password` varchar(255) NOT NULL,
+  `role` enum('admin','manager','staff') DEFAULT 'admin',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `last_login` timestamp NULL DEFAULT NULL,
+  `status` enum('active','inactive') DEFAULT 'active'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Đang đổ dữ liệu cho bảng `qtrivien`
+--
+
+INSERT INTO `qtrivien` (`id`, `username`, `fullname`, `email`, `password`, `role`, `created_at`, `updated_at`, `last_login`, `status`) VALUES
+(1, 'admin', 'lâm cout', 'admin@homestay.com', '$2y$10$QX/4TvFCmFTHZSV6MPb22ujJLG3tO.OgBn2CamSmH9r0DicJyPPBu', 'admin', '2025-11-28 02:37:47', '2025-11-28 02:37:47', NULL, 'active');
+
+-- --------------------------------------------------------
+
+--
 -- Cấu trúc bảng cho bảng `users`
 --
 
 CREATE TABLE `users` (
-  `id` int(11) NOT NULL,
-  `fullname` varchar(100) NOT NULL,
-  `email` varchar(100) NOT NULL,
-  `password` varchar(255) NOT NULL,
-  `role` varchar(20) DEFAULT 'customer'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `user_id` int(10) UNSIGNED NOT NULL,
+  `username` varchar(50) NOT NULL COMMENT 'Tên đăng nhập',
+  `email` varchar(100) NOT NULL COMMENT 'Email',
+  `password` varchar(255) NOT NULL COMMENT 'Mật khẩu đã hash',
+  `fullname` varchar(100) NOT NULL COMMENT 'Họ và tên',
+  `phone` varchar(20) DEFAULT NULL COMMENT 'Số điện thoại',
+  `address` text DEFAULT NULL COMMENT 'Địa chỉ',
+  `avatar` varchar(255) DEFAULT NULL COMMENT 'Đường dẫn ảnh đại diện',
+  `role` enum('customer','vip') DEFAULT 'customer' COMMENT 'Loại khách hàng',
+  `status` enum('active','inactive','banned') DEFAULT 'active' COMMENT 'Trạng thái tài khoản',
+  `email_verified` tinyint(1) DEFAULT 0 COMMENT 'Email đã xác thực chưa',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp() COMMENT 'Ngày đăng ký',
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp() COMMENT 'Ngày cập nhật',
+  `last_login` timestamp NULL DEFAULT NULL COMMENT 'Lần đăng nhập gần nhất'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Bảng khách hàng';
 
 --
 -- Đang đổ dữ liệu cho bảng `users`
 --
 
-INSERT INTO `users` (`id`, `fullname`, `email`, `password`, `role`) VALUES
-(1, 'Admin System', 'admin@homestay.com', '123456', 'admin');
+INSERT INTO `users` (`user_id`, `username`, `email`, `password`, `fullname`, `phone`, `address`, `avatar`, `role`, `status`, `email_verified`, `created_at`, `updated_at`, `last_login`) VALUES
+(1, '', 'lamc6250@gmail.com', 'matkhau123', 'cao lam', NULL, NULL, NULL, 'customer', 'active', 0, '2025-11-30 06:12:41', '2025-11-30 07:54:20', NULL);
 
 --
 -- Chỉ mục cho các bảng đã đổ
@@ -174,7 +215,14 @@ ALTER TABLE `bookings`
 -- Chỉ mục cho bảng `homestays`
 --
 ALTER TABLE `homestays`
-  ADD PRIMARY KEY (`id`);
+  ADD PRIMARY KEY (`homestay_id`);
+
+--
+-- Chỉ mục cho bảng `images`
+--
+ALTER TABLE `images`
+  ADD PRIMARY KEY (`image_id`),
+  ADD KEY `makhs` (`makhs`);
 
 --
 -- Chỉ mục cho bảng `posts`
@@ -183,10 +231,23 @@ ALTER TABLE `posts`
   ADD PRIMARY KEY (`id`);
 
 --
+-- Chỉ mục cho bảng `qtrivien`
+--
+ALTER TABLE `qtrivien`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `username` (`username`),
+  ADD UNIQUE KEY `email` (`email`);
+
+--
 -- Chỉ mục cho bảng `users`
 --
 ALTER TABLE `users`
-  ADD PRIMARY KEY (`id`);
+  ADD PRIMARY KEY (`user_id`),
+  ADD UNIQUE KEY `username` (`username`),
+  ADD UNIQUE KEY `email` (`email`),
+  ADD KEY `idx_email` (`email`),
+  ADD KEY `idx_username` (`username`),
+  ADD KEY `idx_status` (`status`);
 
 --
 -- AUTO_INCREMENT cho các bảng đã đổ
@@ -196,13 +257,19 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT cho bảng `bookings`
 --
 ALTER TABLE `bookings`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT cho bảng `homestays`
 --
 ALTER TABLE `homestays`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=35;
+  MODIFY `homestay_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=35;
+
+--
+-- AUTO_INCREMENT cho bảng `images`
+--
+ALTER TABLE `images`
+  MODIFY `image_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT cho bảng `posts`
@@ -211,10 +278,16 @@ ALTER TABLE `posts`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
+-- AUTO_INCREMENT cho bảng `qtrivien`
+--
+ALTER TABLE `qtrivien`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
 -- AUTO_INCREMENT cho bảng `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `user_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
