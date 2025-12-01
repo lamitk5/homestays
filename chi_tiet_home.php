@@ -186,7 +186,7 @@ while (count($gallery) < 5) {
                         </div>
 
                         <form action="xuly_datphong.php" method="POST">
-                            <input type="hidden" name="homestay_id" value="<?php echo $homestay['id']; ?>">
+                            <input type="hidden" name="homestay_id" value="<?php echo $homestay['homestay_id']; ?>">
                             <input type="hidden" name="price_per_night" value="<?php echo $homestay['price_weekday']; ?>">
                             
                             <div class="border border-gray-400 rounded-lg overflow-hidden mb-4">
