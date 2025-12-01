@@ -7,7 +7,7 @@ $conn->set_charset("utf8mb4"); // Hiển thị tiếng Việt
 
 // 2. LẤY ID TỪ URL
 $homestay_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
-$sql = "SELECT * FROM homestays WHERE id = $homestay_id";
+$sql = "SELECT * FROM homestays WHERE homestay_id = $homestay_id";
 $result = $conn->query($sql);
 
 if ($result->num_rows > 0) {

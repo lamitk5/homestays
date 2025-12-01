@@ -14,10 +14,10 @@ $message = "";
 $message_type = "";
 
 // XỬ LÝ XÓA KHÁCH HÀNG
-if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id'])) {
-    $id = intval($_GET['id']);
-    $stmt = $conn->prepare("DELETE FROM users WHERE id = ?");
-    $stmt->bind_param("i", $id);
+if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['user_id'])) {
+    $user_id = intval($_GET['user_id']);
+    $stmt = $conn->prepare("DELETE FROM users WHERE user_id = ?");
+    $stmt->bind_param("i", $user_id);
     if ($stmt->execute()) {
         $message = "Xóa khách hàng thành công!";
         $message_type = "success";
@@ -26,9 +26,9 @@ if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id']))
 }
 
 // XỬ LÝ CẬP NHẬT TRẠNG THÁI
-if (isset($_GET['action']) && $_GET['action'] == 'toggle_status' && isset($_GET['id'])) {
-    $id = intval($_GET['id']);
-    $conn->query("UPDATE users SET status = IF(status='active', 'inactive', 'active') WHERE id = $id");
+if (isset($_GET['action']) && $_GET['action'] == 'toggle_status' && isset($_GET['user_id'])) {
+    $user_id = intval($_GET['user_id']);
+    $conn->query("UPDATE users SET status = IF(status='active', 'inactive', 'active') WHERE user_id = $user_id");
     $message = "Đã cập nhật trạng thái!";
     $message_type = "success";
 }
@@ -185,8 +185,8 @@ $vip = $conn->query("SELECT COUNT(*) as c FROM users WHERE role='vip'")->fetch_a
                   </td>
                   <td class="px-6 py-4 text-sm text-gray-600"><?php echo date('d/m/Y', strtotime($row['created_at'])); ?></td>
                   <td class="px-6 py-4 text-right">
-                    <a href="?action=toggle_status&id=<?php echo $row['id']; ?>" class="text-blue-600 hover:text-blue-800 font-medium mr-3">Toggle Status</a>
-                    <a href="?action=delete&id=<?php echo $row['id']; ?>" onclick="return confirm('Xóa khách hàng này?')" class="text-red-600 hover:text-red-800 font-medium">Xóa</a>
+                    <a href="?action=toggle_status&id=<?php echo $row['user_id']; ?>" class="text-blue-600 hover:text-blue-800 font-medium mr-3">Toggle Status</a>
+                    <a href="?action=delete&id=<?php echo $row['user_id']; ?>" onclick="return confirm('Xóa khách hàng này?')" class="text-red-600 hover:text-red-800 font-medium">Xóa</a>
                   </td>
                 </tr>
                 <?php endwhile; ?>

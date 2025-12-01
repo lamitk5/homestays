@@ -21,7 +21,7 @@ if (isset($_GET['guests']) && !empty($_GET['guests'])) {
     $where_clause .= " AND max_guests >= $guests";
 }
 
-$sql = "SELECT * FROM homestays WHERE $where_clause ORDER BY id DESC";
+$sql = "SELECT * FROM homestays WHERE $where_clause ORDER BY homestay_id DESC";
 $result = $conn->query($sql);
 ?>
 
@@ -160,7 +160,7 @@ $result = $conn->query($sql);
                 while($row = $result->fetch_assoc()): 
             ?>
             <div class="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 group border border-gray-100 flex flex-col h-full overflow-hidden">
-                <a href="chi_tiet_home.php?id=<?php echo $row['id']; ?>" class="block relative h-64 overflow-hidden">
+                <a href="chi_tiet_home.php?id=<?php echo $row['homestay_id']; ?>" class="block relative h-64 overflow-hidden">
                     <img src="uploads/<?php echo $row['main_image']; ?>" 
                          onerror="this.src='https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=800'"
                          class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
@@ -179,7 +179,7 @@ $result = $conn->query($sql);
                 <div class="p-5 flex flex-col flex-1">
                     <div class="flex justify-between items-start mb-2">
                         <h3 class="font-bold text-lg text-gray-900 line-clamp-2 leading-tight flex-1 mr-2" title="<?php echo $row['name']; ?>">
-                            <a href="chi_tiet_home.php?id=<?php echo $row['id']; ?>" class="hover:text-[#13ecc8] transition">
+                            <a href="chi_tiet_home.php?id=<?php echo $row['homestay_id']; ?>" class="hover:text-[#13ecc8] transition">
                                 <?php echo $row['name']; ?>
                             </a>
                         </h3>
@@ -207,7 +207,7 @@ $result = $conn->query($sql);
                                 <?php echo number_format($row['price_weekday'], 0, ',', '.'); ?>₫
                             </div>
                         </div>
-                        <a href="chi_tiet_home.php?id=<?php echo $row['id']; ?>" class="bg-gray-900 text-white p-2 rounded-lg hover:bg-[#13ecc8] transition shadow-lg flex items-center justify-center">
+                        <a href="chi_tiet_home.php?id=<?php echo $row['homestay_id']; ?>" class="bg-gray-900 text-white p-2 rounded-lg hover:bg-[#13ecc8] transition shadow-lg flex items-center justify-center">
                             <span class="material-symbols-outlined text-lg">arrow_forward</span>
                         </a>
                     </div>
