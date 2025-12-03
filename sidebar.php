@@ -8,7 +8,7 @@ $admin_role = isset($_SESSION['role']) ? ucfirst($_SESSION['role']) : 'Administr
   <div class="p-6 border-b">
     <div class="flex items-center gap-3">
       <span class="material-symbols-outlined text-primary text-3xl">home_work</span>
-      <h1 class="text-xl font-bold text-gray-900">Homestay Pro</h1>
+      <h1 href="trang_chu.php"text-xl font-bold text-gray-900">Homestay Deluxe</h1>
     </div>
   </div>
 

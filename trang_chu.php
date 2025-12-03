@@ -8,20 +8,58 @@ if ($conn->connect_error) {
 }
 $conn->set_charset("utf8mb4");
 
-// 2. XỬ LÝ TÌM KIẾM
+// 🎯 LƯU Ý: Đã xóa đoạn code tự động chuyển hướng Admin tại đây để Admin có thể xem trang chủ.
+
+$user_fullname = isset($_SESSION['fullname']) ? $_SESSION['fullname'] : '';
+
+// 2. XỬ LÝ TÌM KIẾM VÀ LOGIC CHECK LỊCH
 $where_clause = "1=1"; 
 
+// Lọc địa điểm
 if (isset($_GET['location']) && !empty($_GET['location'])) {
     $location = $conn->real_escape_string($_GET['location']);
-    $where_clause .= " AND (district LIKE '%$location%' OR name LIKE '%$location%' OR address LIKE '%$location%')";
+    $where_clause .= " AND (h.district LIKE '%$location%' OR h.name LIKE '%$location%' OR h.address LIKE '%$location%')";
 }
 
+// Lọc số khách
 if (isset($_GET['guests']) && !empty($_GET['guests'])) {
     $guests = intval($_GET['guests']);
-    $where_clause .= " AND max_guests >= $guests";
+    $where_clause .= " AND h.max_guests >= $guests";
 }
 
-$sql = "SELECT * FROM homestays WHERE $where_clause ORDER BY homestay_id DESC";
+// 🎯 LOGIC KIỂM TRA TRẠNG THÁI "ĐÃ ĐẶT" (BOOKED)
+// Mặc định coi là chưa đặt (0)
+$is_booked_column = "0 AS is_booked"; 
+$searching_dates = false; // Biến cờ để biết khách có đang tìm theo ngày không
+
+if (isset($_GET['date_in']) && !empty($_GET['date_in']) && isset($_GET['date_out']) && !empty($_GET['date_out'])) {
+    $searching_dates = true;
+    $d_in = $conn->real_escape_string($_GET['date_in']);
+    $d_out = $conn->real_escape_string($_GET['date_out']);
+    
+    // Subquery kiểm tra trùng lịch:
+    // Nếu tồn tại booking nào có thời gian giao thoa với thời gian khách tìm -> Trả về 1 (True)
+    $is_booked_column = "
+        (SELECT COUNT(*) FROM bookings b 
+         WHERE b.homestay_id = h.homestay_id 
+         AND b.status = 'confirmed'       -- Chỉ tính đơn đã xác nhận
+         AND b.deleted_at IS NULL         -- Bỏ qua đơn đã xóa
+         AND ('$d_in' < b.check_out AND '$d_out' > b.check_in) -- Logic giao thoa ngày
+        ) > 0 AS is_booked
+    ";
+}
+
+// SQL QUERY CHÍNH
+$sql = "
+    SELECT 
+        h.*, 
+        i.image_path AS main_image_path,
+        $is_booked_column
+    FROM homestays h
+    LEFT JOIN images i ON h.homestay_id = i.homestay_id AND i.is_primary = 1
+    WHERE $where_clause 
+    ORDER BY is_booked ASC, h.homestay_id DESC -- Ưu tiên hiện phòng trống trước
+";
 $result = $conn->query($sql);
 ?>
 
@@ -37,15 +75,15 @@ $result = $conn->query($sql);
     <style>
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
         .material-symbols-outlined { vertical-align: middle; }
-        /* Hiệu ứng chuyển cảnh chậm và mượt hơn */
         .slide { 
-            position: absolute; 
-            inset: 0; 
-            width: 100%; 
-            height: 100%; 
-            background-size: cover; 
-            background-position: center; 
-            transition: opacity 1.5s ease-in-out; /* Tăng thời gian lên 1.5s cho mượt */
+            position: absolute; inset: 0; width: 100%; height: 100%; 
+            background-size: cover; background-position: center; 
+            transition: opacity 1.5s ease-in-out; 
+        }
+        /* Style cho nhãn đã đặt */
+        .booked-overlay {
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(2px);
         }
     </style>
 </head>
@@ -62,16 +100,21 @@ $result = $conn->query($sql);
                 <a href="trang_chu.php" class="text-[#13ecc8] font-bold">Trang chủ</a>
                 <a href="kham_pha.php" class="hover:text-[#13ecc8] transition">Khám phá</a>
                 <a href="blog.php" class="hover:text-[#13ecc8] transition">Blog</a>
-                <a href="ho_tro.php" class="hover:text-[#13ecc8] transition">Hỗ trợ</a>
             </nav>
 
             <div class="flex items-center gap-4">
                 <?php if(isset($_SESSION['fullname'])): ?>
                     <div class="flex items-center gap-3">
-                        <span class="text-sm font-medium hidden sm:block">Hi, <b><?php echo $_SESSION['fullname']; ?></b></span>
-                        <?php if($_SESSION['role'] == 'admin'): ?>
-                            <a href="dashboard.php" class="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-bold hover:bg-blue-200 transition">Quản trị</a>
+                        
+                        <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'): ?>
+                            <a href="dashboard.php" class="hidden md:flex items-center gap-1 bg-gray-900 text-white px-3 py-1.5 rounded-full text-xs font-bold hover:bg-gray-700 transition shadow-md border border-gray-700">
+                                <span class="material-symbols-outlined text-[16px]">admin_panel_settings</span>
+                                Quản trị
+                            </a>
                         <?php endif; ?>
+                        <a href="chitiet_kh.php" class="text-sm font-medium hidden sm:block hover:text-[#13ecc8] transition">
+                             Hi, <b><?php echo htmlspecialchars($user_fullname); ?></b>
+                        </a>
                         <a href="logout.php" class="text-sm text-red-500 font-bold hover:underline">Đăng xuất</a>
                     </div>
                 <?php else: ?>
@@ -83,53 +126,44 @@ $result = $conn->query($sql);
     </header>
 
     <div class="relative h-[600px] w-full overflow-hidden group bg-gray-900">
-        
         <div id="slider-container" class="absolute inset-0 w-full h-full">
             <div class="slide opacity-100 z-10" style="background-image: url('https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?q=80&w=1920');"></div>
             <div class="slide opacity-0 z-0" style="background-image: url('https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=1920');"></div>
             <div class="slide opacity-0 z-0" style="background-image: url('https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=1920');"></div>
-            <div class="slide opacity-0 z-0" style="background-image: url('https://images.unsplash.com/photo-1613490493576-2f5037657918?q=80&w=1920');"></div>
-            <div class="slide opacity-0 z-0" style="background-image: url('https://images.unsplash.com/photo-1510798831971-661eb04b3739?q=80&w=1920');"></div>
         </div>
 
         <div class="absolute inset-0 bg-black/40 z-20 pointer-events-none"></div>
-
-        <button onclick="prevSlide()" class="absolute left-4 top-1/2 -translate-y-1/2 z-50 bg-white/20 hover:bg-white/40 text-white p-3 rounded-full backdrop-blur-sm transition opacity-0 group-hover:opacity-100 cursor-pointer border border-white/30">
-            <span class="material-symbols-outlined text-3xl">chevron_left</span>
-        </button>
-        <button onclick="nextSlide()" class="absolute right-4 top-1/2 -translate-y-1/2 z-50 bg-white/20 hover:bg-white/40 text-white p-3 rounded-full backdrop-blur-sm transition opacity-0 group-hover:opacity-100 cursor-pointer border border-white/30">
-            <span class="material-symbols-outlined text-3xl">chevron_right</span>
-        </button>
 
         <div class="absolute inset-0 flex flex-col items-center justify-center px-4 text-center z-30">
             <h1 class="text-3xl md:text-5xl lg:text-6xl font-extrabold text-white mb-6 drop-shadow-xl tracking-tight leading-tight">
                 Tìm kiếm chốn dừng chân hoàn hảo
             </h1>
-            <p class="text-base md:text-xl text-gray-100 font-medium mb-10 drop-shadow-md max-w-2xl">
-                Khám phá hàng ngàn homestay độc đáo tại Hà Nội và vùng lân cận với giá tốt nhất.
-            </p>
-
+            
             <form action="trang_chu.php" method="GET" class="bg-white p-2 md:p-3 rounded-[32px] shadow-2xl max-w-4xl w-full flex flex-col md:flex-row gap-2 items-stretch md:items-center relative z-40">
                 <div class="flex-1 px-4 py-2 border-b md:border-b-0 md:border-r border-gray-200 relative group text-left">
                     <label class="block text-[10px] md:text-xs font-bold text-gray-800 ml-7 uppercase tracking-wider mb-1">Địa điểm</label>
                     <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#13ecc8] transition">search</span>
-                    <input type="text" name="location" class="w-full pl-7 pr-2 py-1 outline-none text-gray-700 font-bold placeholder-gray-400 bg-transparent text-sm md:text-base" placeholder="Bạn muốn đi đâu? (VD: Tây Hồ)" value="<?php echo isset($_GET['location']) ? htmlspecialchars($_GET['location']) : ''; ?>">
+                    <input type="text" name="location" class="w-full pl-7 pr-2 py-1 outline-none text-gray-700 font-bold placeholder-gray-400 bg-transparent text-sm md:text-base" placeholder="Bạn muốn đi đâu?" value="<?php echo isset($_GET['location']) ? htmlspecialchars($_GET['location']) : ''; ?>">
                 </div>
+
                 <div class="w-full md:w-40 px-4 py-2 border-b md:border-b-0 md:border-r border-gray-200 text-left">
                     <label class="block text-[10px] md:text-xs font-bold text-gray-800 uppercase tracking-wider mb-1">Ngày đến</label>
-                    <input type="text" onfocus="(this.type='date')" onblur="(this.type='text')" placeholder="Thêm ngày" class="w-full py-1 outline-none text-gray-600 font-medium bg-transparent cursor-pointer text-sm">
+                    <input type="text" id="checkin" name="date_in" placeholder="Thêm ngày" value="<?php echo isset($_GET['date_in']) ? htmlspecialchars($_GET['date_in']) : ''; ?>" class="w-full py-1 outline-none text-gray-600 font-medium bg-transparent cursor-pointer text-sm">
                 </div>
+
                 <div class="w-full md:w-40 px-4 py-2 border-b md:border-b-0 md:border-r border-gray-200 text-left">
                     <label class="block text-[10px] md:text-xs font-bold text-gray-800 uppercase tracking-wider mb-1">Ngày đi</label>
-                    <input type="text" onfocus="(this.type='date')" onblur="(this.type='text')" placeholder="Thêm ngày" class="w-full py-1 outline-none text-gray-600 font-medium bg-transparent cursor-pointer text-sm">
+                    <input type="text" id="checkout" name="date_out" placeholder="Thêm ngày" value="<?php echo isset($_GET['date_out']) ? htmlspecialchars($_GET['date_out']) : ''; ?>" class="w-full py-1 outline-none text-gray-600 font-medium bg-transparent cursor-pointer text-sm">
                 </div>
+
                 <div class="w-full md:w-40 px-4 py-2 relative text-left">
                     <label class="block text-[10px] md:text-xs font-bold text-gray-800 ml-6 uppercase tracking-wider mb-1">Số khách</label>
                     <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">group_add</span>
-                    <input type="number" name="guests" min="1" class="w-full pl-6 pr-2 py-1 outline-none text-gray-700 font-bold bg-transparent placeholder-gray-400 text-sm md:text-base" placeholder="Thêm khách" value="<?php echo isset($_GET['guests']) ? htmlspecialchars($_GET['guests']) : ''; ?>">
+                    <input type="number" name="guests" min="1" class="w-full pl-6 pr-2 py-1 outline-none text-gray-700 font-bold bg-transparent placeholder-gray-400 text-sm md:text-base" placeholder="Khách" value="<?php echo isset($_GET['guests']) ? htmlspecialchars($_GET['guests']) : ''; ?>">
                 </div>
+
                 <button type="submit" class="bg-[#13ecc8] hover:bg-[#10d4b4] text-white rounded-[24px] px-8 py-3 md:py-4 font-bold text-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all flex items-center justify-center gap-2">
-                    <span class="material-symbols-outlined">search</span> Tìm
+                    <span class="material-symbols-outlined">search</span>
                 </button>
             </form>
         </div>
@@ -139,77 +173,86 @@ $result = $conn->query($sql);
         <div class="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
             <h2 class="text-2xl md:text-3xl font-extrabold text-gray-900">
                 <?php 
-                if(isset($_GET['location']) && !empty($_GET['location'])) 
-                    echo 'Kết quả tìm kiếm cho "' . htmlspecialchars($_GET['location']) . '"';
+                if($searching_dates) 
+                    echo 'Kết quả từ ' . date('d/m', strtotime($_GET['date_in'])) . ' đến ' . date('d/m', strtotime($_GET['date_out']));
+                else if(isset($_GET['location']) && !empty($_GET['location'])) 
+                    echo 'Kết quả cho "' . htmlspecialchars($_GET['location']) . '"';
                 else 
                     echo 'Khám phá điểm đến nổi bật';
                 ?>
             </h2>
-            
-            <div class="flex flex-wrap gap-2">
-                <a href="trang_chu.php" class="px-4 py-2 bg-black text-white border border-black rounded-full text-sm font-bold shadow-sm transition">Tất cả</a>
-                <a href="trang_chu.php?location=Tây Hồ" class="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm font-medium hover:border-[#13ecc8] hover:text-[#13ecc8] transition">Tây Hồ</a>
-                <a href="trang_chu.php?location=Sóc Sơn" class="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm font-medium hover:border-[#13ecc8] hover:text-[#13ecc8] transition">Sóc Sơn</a>
-                <a href="trang_chu.php?location=Ba Vì" class="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm font-medium hover:border-[#13ecc8] hover:text-[#13ecc8] transition">Ba Vì</a>
-            </div>
         </div>
         
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
             <?php 
             if ($result->num_rows > 0):
                 while($row = $result->fetch_assoc()): 
+                    $image_src = "https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=800";
+                    if (!empty($row['main_image_path'])) {
+                        $image_src = "uploads/" . htmlspecialchars($row['main_image_path']);
+                    }
+                    
+                    // Kiểm tra trạng thái booked
+                    $is_booked = $row['is_booked'] == 1;
             ?>
-            <div class="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 group border border-gray-100 flex flex-col h-full overflow-hidden">
+            <div class="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 group border border-gray-100 flex flex-col h-full overflow-hidden relative">
+                
                 <a href="chi_tiet_home.php?id=<?php echo $row['homestay_id']; ?>" class="block relative h-64 overflow-hidden">
-                    <img src="uploads/<?php echo $row['main_image']; ?>" 
-                         onerror="this.src='https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=800'"
-                         class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                    
+                    <img src="<?php echo $image_src; ?>" 
+                         class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 <?php echo $is_booked ? 'grayscale-[50%]' : ''; ?>"
                          alt="<?php echo $row['name']; ?>">
                     
-                    <div class="absolute top-3 left-3 bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold shadow-sm flex items-center gap-1 text-gray-800">
+                    <?php if ($is_booked): ?>
+                        <div class="absolute inset-0 bg-black/50 z-10 flex items-center justify-center">
+                            <div class="bg-red-600 text-white font-bold px-4 py-2 rounded-lg transform -rotate-6 border-2 border-white shadow-2xl flex items-center gap-1">
+                                <span class="material-symbols-outlined text-sm">event_busy</span>
+                                ĐÃ KÍN LỊCH
+                            </div>
+                        </div>
+                    <?php endif; ?>
+
+                    <div class="absolute top-3 left-3 bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold shadow-sm flex items-center gap-1 text-gray-800 z-20">
                         <span class="material-symbols-outlined text-[16px] text-red-500">location_on</span>
                         <?php echo $row['district']; ?>
                     </div>
-                    
-                    <div class="absolute top-3 right-3 bg-black/20 p-1.5 rounded-full hover:bg-white/20 transition cursor-pointer text-white hover:text-red-500">
-                        <span class="material-symbols-outlined block">favorite</span>
-                    </div>
                 </a>
                 
-                <div class="p-5 flex flex-col flex-1">
+                <div class="p-5 flex flex-col flex-1 <?php echo $is_booked ? 'bg-gray-50' : ''; ?>">
                     <div class="flex justify-between items-start mb-2">
-                        <h3 class="font-bold text-lg text-gray-900 line-clamp-2 leading-tight flex-1 mr-2" title="<?php echo $row['name']; ?>">
+                        <h3 class="font-bold text-lg text-gray-900 line-clamp-2 leading-tight flex-1 mr-2">
                             <a href="chi_tiet_home.php?id=<?php echo $row['homestay_id']; ?>" class="hover:text-[#13ecc8] transition">
                                 <?php echo $row['name']; ?>
                             </a>
                         </h3>
-                        <div class="flex items-center gap-1 text-xs font-bold bg-gray-100 px-2 py-1 rounded whitespace-nowrap">
+                        <div class="flex items-center gap-1 text-xs font-bold bg-gray-100 px-2 py-1 rounded">
                             <span class="material-symbols-outlined text-[14px] text-orange-500" style="font-variation-settings: 'FILL' 1;">star</span> 
                             <?php echo isset($row['rating']) ? $row['rating'] : '5.0'; ?> 
-                            <span class="text-gray-400 font-normal ml-1">(<?php echo isset($row['num_reviews']) ? $row['num_reviews'] : '18'; ?>)</span>
                         </div>
                     </div>
-
-                    <p class="text-gray-500 text-xs mb-3 line-clamp-1">
-                        <?php echo $row['address']; ?>
-                    </p>
 
                     <div class="flex items-center gap-4 text-xs text-gray-500 font-medium mb-4 pt-3 border-t border-dashed border-gray-100 mt-auto">
                         <div class="flex items-center gap-1"><span class="material-symbols-outlined text-[18px]">bed</span> <?php echo $row['num_bedrooms']; ?> PN</div>
                         <div class="flex items-center gap-1"><span class="material-symbols-outlined text-[18px]">group</span> Max <?php echo $row['max_guests']; ?></div>
-                        <div class="flex items-center gap-1"><span class="material-symbols-outlined text-[18px]">single_bed</span> <?php echo $row['num_beds']; ?> G</div>
                     </div>
 
                     <div class="flex justify-between items-end">
                         <div class="flex flex-col">
-                            <span class="text-[10px] text-gray-400 font-bold uppercase tracking-wide">Giá từ (T2-T5)</span>
-                            <div class="text-[#13ecc8] font-black text-xl">
+                            <span class="text-[10px] text-gray-400 font-bold uppercase tracking-wide">Giá từ</span>
+                            <div class="<?php echo $is_booked ? 'text-gray-400 decoration-gray-400' : 'text-[#13ecc8]'; ?> font-black text-xl">
                                 <?php echo number_format($row['price_weekday'], 0, ',', '.'); ?>₫
                             </div>
                         </div>
-                        <a href="chi_tiet_home.php?id=<?php echo $row['homestay_id']; ?>" class="bg-gray-900 text-white p-2 rounded-lg hover:bg-[#13ecc8] transition shadow-lg flex items-center justify-center">
-                            <span class="material-symbols-outlined text-lg">arrow_forward</span>
-                        </a>
+                        
+                        <?php if ($is_booked): ?>
+                            <button disabled class="bg-gray-300 text-gray-500 px-4 py-2 rounded-lg font-bold text-sm cursor-not-allowed flex items-center gap-1">
+                                Đã đặt
+                            </button>
+                        <?php else: ?>
+                            <a href="chi_tiet_home.php?id=<?php echo $row['homestay_id']; ?>" class="bg-gray-900 text-white p-2 rounded-lg hover:bg-[#13ecc8] transition shadow-lg">
+                                <span class="material-symbols-outlined text-lg">arrow_forward</span>
+                            </a>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -217,71 +260,76 @@ $result = $conn->query($sql);
                 endwhile; 
             else:
             ?>
-                <div class="col-span-1 md:col-span-2 lg:col-span-3 xl:col-span-4 py-20 text-center bg-white rounded-2xl border border-dashed border-gray-300">
+                <div class="col-span-full py-20 text-center bg-white rounded-2xl border border-dashed border-gray-300">
                     <p class="text-xl font-bold text-gray-600">Không tìm thấy homestay nào phù hợp.</p>
-                    <a href="trang_chu.php" class="inline-block mt-6 px-6 py-2 bg-[#13ecc8] text-white font-bold rounded-full hover:bg-[#10d4b4] transition">Xem tất cả</a>
                 </div>
             <?php endif; ?>
         </div>
     </main>
 
     <footer class="bg-gray-900 text-white py-12 mt-auto">
-        <div class="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div class="col-span-1 md:col-span-2">
-                <h2 class="text-2xl font-bold mb-4 flex items-center gap-2">
-                    <span class="material-symbols-outlined text-[#13ecc8] text-3xl">other_houses</span> HomestayApp
-                </h2>
-                <p class="text-gray-400 text-sm leading-relaxed max-w-sm">Nền tảng đặt phòng homestay uy tín.</p>
-            </div>
-            <div>
-                <h3 class="font-bold text-lg mb-4 text-white">Liên hệ</h3>
-                <ul class="space-y-2 text-gray-400 text-sm">
-                    <li>support@homestayapp.com</li>
-                    <li>1900 1234</li>
-                </ul>
-            </div>
-        </div>
-        <div class="max-w-7xl mx-auto px-4 mt-12 pt-8 border-t border-gray-800 text-center text-gray-600 text-sm">
-            <p>© 2024 HomestayApp. All rights reserved.</p>
+        <div class="max-w-7xl mx-auto px-4 text-center">
+            <h2 class="text-2xl font-bold mb-4 flex items-center justify-center gap-2">
+                <span class="material-symbols-outlined text-[#13ecc8] text-3xl">other_houses</span> HomestayApp
+            </h2>
+            <p class="text-gray-400 text-sm">© 2024 HomestayApp. All rights reserved.</p>
         </div>
     </footer>
 
     <script>
+        // SLIDER
         const slides = document.querySelectorAll('.slide');
         let currentSlide = 0;
-        let slideInterval;
-
         function showSlide(index) {
-            slides.forEach((slide, i) => {
+            slides.forEach((slide) => {
                 slide.classList.remove('z-10', 'opacity-100');
                 slide.classList.add('z-0', 'opacity-0');
             });
             slides[index].classList.remove('z-0', 'opacity-0');
             slides[index].classList.add('z-10', 'opacity-100');
         }
-
         function nextSlide() {
             currentSlide = (currentSlide + 1) % slides.length;
             showSlide(currentSlide);
-            resetTimer();
+        }
+        setInterval(nextSlide, 5000);
+
+        // DATE LOGIC
+        const checkinInput = document.getElementById('checkin');
+        const checkoutInput = document.getElementById('checkout');
+
+        function getTodayDate() {
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
         }
 
-        function prevSlide() {
-            currentSlide = (currentSlide - 1 + slides.length) % slides.length;
-            showSlide(currentSlide);
-            resetTimer();
-        }
+        checkinInput.addEventListener('focus', function() {
+            this.type = 'date';
+            this.min = getTodayDate();
+        });
 
-        function startTimer() {
-            slideInterval = setInterval(nextSlide, 5000);
-        }
+        checkinInput.addEventListener('change', function() {
+            const checkinDate = this.value;
+            if (checkoutInput.value && checkoutInput.value <= checkinDate) {
+                checkoutInput.value = '';
+            }
+            checkoutInput.min = checkinDate;
+        });
 
-        function resetTimer() {
-            clearInterval(slideInterval);
-            startTimer();
-        }
+        checkoutInput.addEventListener('focus', function() {
+            this.type = 'date';
+            if (checkinInput.value) {
+                this.min = checkinInput.value;
+            } else {
+                this.min = getTodayDate();
+            }
+        });
 
-        startTimer();
+        checkinInput.addEventListener('blur', function() { if (!this.value) this.type = 'text'; });
+        checkoutInput.addEventListener('blur', function() { if (!this.value) this.type = 'text'; });
     </script>
 </body>
 </html>
